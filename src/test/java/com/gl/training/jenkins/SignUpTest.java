@@ -1,93 +1,67 @@
 package com.gl.training.jenkins;
 
-
 import com.gl.training.BaseTestNG;
+import com.gl.training.entities.User;
+import com.gl.training.pages.SignUpPage;
+import com.gl.training.pages.UserProfileDeletePage;
+import com.gl.training.pages.UserProfilePage;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.firefox.FirefoxDriver;
-import org.testng.annotations.*;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import static com.gl.training.utils.CommonOperations.verifyCurrentUrl;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 public class SignUpTest extends BaseTestNG {
 
-    WebElement signUpForm;
-    WebElement userNameField;
-    WebElement passwordField;
-    WebElement confirmPasswordField;
-    WebElement fullNameField;
-    WebElement emailField;
-    //url:
-    private String signUpUrlPart = "/signup";
-    private String loginErrorUrlPart = "/loginError";
-    private String signUpSuccessUrlPart = "/securityRealm/createAccount";
+    private SignUpPage signUpPage;
 
-    //locator:
-    private String formSignUpLocatorXpath = "//form[@action='/securityRealm/createAccount']";
-    private String inputUserNameLocatorName = "username";
-    private String inputPasswordLocatorName = "password1";
-    private String inputConfirmPasswordLocatorName = "password2";
-    private String inputFullNameLocatorName = "fullname";
-    private String inputEmailLocatorName = "email";
+
+    private String signUpResultUrl = "http://seltr-kbp1-1.synapse.com:8080/securityRealm/createAccount";
+    private String signUpSuccessUrlPart = "/securityRealm/createAccount";
     private String successMessageLocator = "//div[@id='main-panel-content']/h1";
+    private String loginErrorUrlPart = "/loginError";
+
     private String loggedInFullNameLocatorXpath = "//a[@class='model-link inside inverse']/b";
+
+    private String expectedErrorMessage = "Invalid login information. Please try again.";
 
     @BeforeMethod
     public void setUp() {
-        driver.manage().deleteAllCookies();
-        driver.get(baseUrl + signUpUrlPart);
-        signUpForm = driver.findElement(By.xpath(formSignUpLocatorXpath));
-        userNameField = driver.findElement(By.name(inputUserNameLocatorName));
-        passwordField = driver.findElement(By.name(inputPasswordLocatorName));
-        confirmPasswordField = driver.findElement(By.name(inputConfirmPasswordLocatorName));
-        fullNameField = driver.findElement(By.name(inputFullNameLocatorName));
-        emailField = driver.findElement(By.name(inputEmailLocatorName));
+        deleteAllCookies();
+        signUpPage = new SignUpPage(driver).get();
+        signUpPage.waitForPageLoaded();
     }
 
     @Test(dataProvider = "negativeSignUpData")
     public void negativeTest(String name, String password, String confirmPassword,
                              String fullName, String email, String logMessage) {
-        log(logMessage);
-        submitSignUp(name, password, confirmPassword, fullName, email);
-        verifyCurrentUrl(driver, baseUrl + loginErrorUrlPart);
+        log.info("Test: " + logMessage);
+        signUpPage.submitSignUp(name, password, confirmPassword, fullName, email);
+        verifyCurrentUrl(driver, signUpPage.getPageURL());
         WebElement txtErrorMessage = driver.findElement(By.xpath("//div[@id='main-panel-content']/div"));
         String actualErrorMessage = (txtErrorMessage.getText().split("\n"))[0];
-        String expectedErrorMessage = "Invalid login information. Please try again.";
-        assertEquals(actualErrorMessage, "Invalid login information. Please try again.",
+        assertEquals(actualErrorMessage, expectedErrorMessage,
                 "Error message is: '" + actualErrorMessage + "', but expected: '" + expectedErrorMessage + "'!");
     }
 
     @Test(dataProvider = "positiveSignUpData")
     public void positiveTest(String name, String password, String confirmPassword,
                              String fullName, String email, String logMessage) {
-        log(logMessage);
-        submitSignUp(name, password, confirmPassword, fullName, email);
-        verifyCurrentUrl(driver, baseUrl + loginErrorUrlPart);
+        log.info("Test: " + logMessage);
+        signUpPage.submitSignUp(name, password, confirmPassword, fullName, email);
+        verifyCurrentUrl(driver, signUpPage.getPageURL());
     }
 
-    public void submitSignUp(String name, String password, String confirmPassword, String fullName, String email) {
-        sendKeys(userNameField, name);
-        sendKeys(passwordField, password);
-        sendKeys(confirmPasswordField, confirmPassword);
-        sendKeys(fullNameField, fullName);
-        sendKeys(emailField, email);
-        signUpForm.submit();
+    @Test(dependsOnMethods = "positiveTest", dataProvider = "positiveSignUpData")
+    public void deleteUser(String name, String password, String confirmPassword,
+                           String fullName, String email, String logMessage){
+        log.info("Try to delete created users");
+        User user = new User(name, password, fullName, email);
+        signUpPage.getHeader().submitTextToSearch(name);
+        UserProfilePage userProfilePage = new UserProfilePage(driver, user);
+        UserProfileDeletePage userProfileDeletePage = userProfilePage.clickDelete();
+        userProfileDeletePage.submitDeletion();
     }
-
-    @DataProvider
-    public Object[][] positiveSignUpData(){
-        return new Object[][]{
-                {}
-        };
-    }
-
-    @DataProvider
-    public Object[][] negativeSignUpData(){
-        return new Object[][]{
-                {}
-        };
-    }
-
 }
